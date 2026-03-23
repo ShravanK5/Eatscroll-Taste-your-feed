@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Syne:wght@500;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+
+body {
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* This makes the "Eat" part look very premium */
+.font-black {
+  font-weight: 900;
+}
+body {
+  @apply bg-dark text-white font-body overflow-hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  @apply font-display;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.glass {
+  @apply bg-white/10 backdrop-blur-md border border-white/20;
+}
+
+.glass-dark {
+  @apply bg-black/40 backdrop-blur-md border border-white/10;
+}
+
+@keyframes heart-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-heart-pop {
+  animation: heart-pop 0.3s ease-out forwards;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(255,107,53,0.4); }
+  50% { box-shadow: 0 0 25px rgba(255,107,53,0.8); }
+}
+.animate-order-btn-pulse {
+  animation: pulse 2s infinite;
+}
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+* {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
