@@ -1,4 +1,25 @@
+# dependencies
 node_modules/
+
+# env files
 .env
+.env.*
+
+# build folders
 dist/
 build/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+
+# optional: frontend build
+frontend/build/
+
+# optional: backend logs/uploads
+backend/logs/
+backend/uploads/
