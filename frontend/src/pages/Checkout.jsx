@@ -7,12 +7,12 @@ export default function Checkout() {
   const navigate = useNavigate();
   // FIX: was calling placeOrder({total, method, address}) but placeOrder expects
   //      a reel object. Now uses placeCheckoutOrder which has the correct signature.
-  const { cart, placeCheckoutOrder } = useStore();
+  const { cart, placeOrder } = useStore();
   const [method, setMethod] = useState('UPI');
   const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0) + 2.99;
 
-  const handlePlaceOrder = () => {
-    placeCheckoutOrder({ total, method, address: "123 Main St, Apt 4B" });
+  const handlePlaceOrder = async () => {
+    await placeOrder();
     navigate('/success');
   };
 

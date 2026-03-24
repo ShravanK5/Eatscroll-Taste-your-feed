@@ -2,34 +2,34 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
+const jwt = require("jsonwebtoken");
 
-// SIGNUP
+// REGISTER
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password, role, shopName } = req.body;
 
-    // 🛑 BLOCK DUPLICATES: Check if email already exists anywhere
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ error: `This email is already registered as a ${existingUser.role}.` });
+      return res.status(400).json({ error: "Email already exists" });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = new User({ 
-      name, 
-      email, 
-      password: hashedPassword, 
-      role, 
-      shopName: role === 'owner' ? shopName : null 
+    const newUser = new User({
+      name,
+      email,
+      password: hashedPassword,
+      role,
+      shopName: role === "owner" ? shopName : null
     });
 
     await newUser.save();
-    const { password: _, ...userResponse } = newUser.toObject();
-    res.status(201).json(userResponse);
-  } catch (error) {
-    res.status(500).json({ error: 'Signup failed. Please try again.' });
+
+    res.status(201).json({ message: "User registered successfully" });
+
+  } catch (err) {
+    res.status(500).json({ error: "Signup failed" });
   }
 });
 
@@ -37,16 +37,25 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+
     const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!isMatch) return res.status(401).json({ error: "Invalid credentials" });
 
-    const { password: _, ...userResponse } = user.toObject();
-    res.status(200).json(userResponse);
-  } catch (error) {
-    res.status(500).json({ error: 'Login failed' });
+    const token = jwt.sign(
+      { id: user._id, role: user.role, name: user.name },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    const { password: _, ...userData } = user.toObject();
+
+    res.json({ user: userData, token });
+
+  } catch (err) {
+    res.status(500).json({ error: "Login failed" });
   }
 });
 

@@ -22,13 +22,15 @@ export default function OwnerLogin() {
     setError('');
     try {
       const res = await axios.post(`${API_BASE_URL}/api/auth/login`, { email, password });
-      const user = res.data;
+      const { user, token } = res.data;
 
-      if (user.role !== 'owner') {
+      if (!user || user.role !== 'owner') {
         setError('This account is not registered as an owner.');
         return;
       }
 
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
       localStorage.setItem('currentUser', JSON.stringify(user));
       setCurrentUser(user);
       navigate('/owner/dashboard');

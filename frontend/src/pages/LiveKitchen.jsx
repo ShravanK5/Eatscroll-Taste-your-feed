@@ -68,8 +68,10 @@ const LiveKitchen = () => {
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="text-xl font-bold">{order.itemName}</h3>
-                  <p className="text-gray-400 text-sm">Customer: {order.customerName}</p>
+                  <h3 className="text-xl font-bold">
+                    {order.items?.map(i => `${i.quantity}x ${i.itemName}`).join(', ') || 'Order'}
+                  </h3>
+                  <p className="text-gray-400 text-sm">Customer: {order.customerName} • Total: ₹{order.totalAmount?.toFixed(2)}</p>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
                   order.status === 'pending' ? 'bg-orange-500 text-black' : 'bg-blue-500 text-white'

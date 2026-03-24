@@ -1,67 +1,56 @@
 const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
+const verifyToken = require("../middleware/auth");
 
-// FIX 1: REMOVED the duplicate router.post('/') — Express only runs the FIRST match,
-//         so the second one was completely dead code and caused confusion.
-// FIX 2: Field names now match the Order schema AND what useStore.js sends.
-// FIX 3: Status defaults to 'pending' — 'sent' was NOT in the enum and caused a
-//         Mongoose ValidationError on every single order placement.
-
-// CREATE an order
-router.post('/', async (req, res) => {
+// CREATE ORDER
+router.post('/', verifyToken, async (req, res) => {
   try {
-    const { userId, customerName, shopName, itemName, price } = req.body;
+    const { items, totalAmount, shopName } = req.body;
+
     const newOrder = new Order({
-      userId,
-      customerName,
+      userId: req.user.id,
+      customerName: req.user.name,
       shopName,
-      itemName,
-      price,
-      status: 'pending'   // was 'sent' — invalid enum value, now fixed
+      items,
+      totalAmount
     });
+
     const savedOrder = await newOrder.save();
+
+    req.app.get("io").emit("new-order", savedOrder);
+
     res.status(201).json(savedOrder);
-  } catch (error) {
-    console.error("Backend Post Error:", error);
-    res.status(500).json({ error: 'Failed to create order' });
+
+  } catch (err) {
+    res.status(500).json({ error: "Order failed" });
   }
 });
 
-// GET all orders (sorted newest first)
+// GET ORDERS
 router.get('/', async (req, res) => {
-  try {
-    const orders = await Order.find().sort({ createdAt: -1 });
-    res.status(200).json(orders);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch orders' });
-  }
+  const orders = await Order.find().sort({ createdAt: -1 });
+  res.json(orders);
 });
 
-// UPDATE order status
+// UPDATE STATUS
 router.patch('/:id', async (req, res) => {
-  try {
-    const { status } = req.body;
-    const updatedOrder = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    );
-    if (!updatedOrder) return res.status(404).json({ error: "Order not found" });
-    res.status(200).json(updatedOrder);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update status' });
-  }
-});
+  const updated = await Order.findByIdAndUpdate(
+    req.params.id,
+    { status: req.body.status },
+    { new: true }
+  );
 
-// DELETE an order
+  res.json(updated);
+});
+// DELETE ORDER
 router.delete('/:id', async (req, res) => {
   try {
-    const deletedOrder = await Order.findByIdAndDelete(req.params.id);
-    if (!deletedOrder) return res.status(404).json({ error: "Order not found" });
-    res.status(200).json({ message: "Order deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete order' });
+    const deleted = await Order.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Order not found" });
+    res.json({ message: "Order deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete order" });
   }
 });
 

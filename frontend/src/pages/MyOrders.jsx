@@ -23,7 +23,15 @@ const MyOrders = () => {
       .catch(err => console.error('Failed to fetch orders', err));
 
     socket.on('status-changed', ({ orderId, status }) => {
-      setOrders(prev => prev.map(o => o._id === orderId ? { ...o, status } : o));
+      setOrders(prev => {
+        const order = prev.find(o => o._id === orderId);
+        if (order) {
+          if (status === 'preparing') alert(`Your order ${order.items?.[0]?.itemName} is being PREPARED! 🔥`);
+          if (status === 'ready') alert(`Your order ${order.items?.[0]?.itemName} is READY! ✅`);
+          return prev.map(o => o._id === orderId ? { ...o, status } : o);
+        }
+        return prev;
+      });
     });
 
     // FIX: was listening on 'update-status' — but server emits 'status-changed'
@@ -64,8 +72,8 @@ const MyOrders = () => {
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="font-bold text-lg text-gray-800">{order.itemName}</h3>
-                  <p className="text-sm text-gray-500">{order.shopName} • ₹{order.price}</p>
+                  <h3 className="font-bold text-lg text-gray-800">{order.items?.[0]?.itemName || 'Order'}</h3>
+                  <p className="text-sm text-gray-500">{order.shopName} • ₹{order.totalAmount?.toFixed(2)}</p>
                 </div>
                 <div className="text-2xl">
                   {order.status === 'ready' ? '✅' : order.status === 'preparing' ? '🔥' : '⏳'}

@@ -1,117 +1,119 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { API_BASE_URL } from '../config';
+import { create } from "zustand";
+import { API } from "../api/api";
+import { API_BASE_URL } from "../config";
 
-const API_URL = `${API_BASE_URL}/api`;
+export const useStore = create((set, get) => ({
+  reels: [],
+  cart: [],
+  orders: [],
+  currentUser: null,
+  userLikes: [],
 
-export const useStore = create(
-  persist(
-    (set, get) => ({
-      reels: [],
-      orders: [],
-      userLikes: [],
-      currentUser: null,
+  setCurrentUser: (user) => set({ currentUser: user }),
 
-      // ─── CART (was missing entirely — Cart.jsx and Checkout.jsx both crashed) ───
-      cart: [],
+  // 🔐 LOGIN
+  login: async (data) => {
+    const res = await API.login(data);
+    if (res.token) {
+      localStorage.setItem("token", res.token);
+      localStorage.setItem("user", JSON.stringify(res.user)); // ✅ SAVE USER
+      set({ currentUser: res.user });
+    }
+  },
 
-      addToCart: (reel) => set((state) => {
-        const existing = state.cart.find(item => item._id === reel._id);
-        if (existing) {
-          return {
-            cart: state.cart.map(item =>
-              item._id === reel._id
-                ? { ...item, quantity: item.quantity + 1 }
-                : item
-            )
-          };
-        }
-        return { cart: [...state.cart, { ...reel, quantity: 1 }] };
-      }),
+  // 🔥 AUTO LOGIN (IMPORTANT)
+  loadUser: () => {
+    const savedUser = localStorage.getItem("user");
+    if (savedUser) {
+      set({ currentUser: JSON.parse(savedUser) });
+    }
+  },
 
-      // FIX: updateCartQuantity was missing — Cart.jsx crashed looking for it
-      updateCartQuantity: (id, delta) => set((state) => ({
-        cart: state.cart
-          .map(item => item._id === id ? { ...item, quantity: item.quantity + delta } : item)
-          .filter(item => item.quantity > 0)
-      })),
+  fetchReels: async () => {
+    const data = await API.getReels();
+    set({ reels: data });
+  },
 
-      clearCart: () => set({ cart: [] }),
+  fetchOrders: async () => {
+    const res = await fetch(`${API_BASE_URL}/api/orders`, {
+      headers: {
+        Authorization: localStorage.getItem("token") ? `Bearer ${localStorage.getItem("token")}` : ""
+      }
+    });
+    const data = await res.json();
+    set({ orders: data });
+  },
 
-      setCurrentUser: (user) => set({ currentUser: user }),
+  addToCart: (item) => {
+    set((state) => ({
+      cart: [...state.cart, { ...item, quantity: 1 }]
+    }));
+  },
 
-      fetchReels: async () => {
-        try {
-          const res = await fetch(`${API_URL}/reels`);
-          const data = await res.json();
-          set({ reels: data });
-        } catch (error) {
-          console.error("Reel fetch error", error);
-        }
-      },
+  placeOrder: async (reel, quantity = 1) => {
+    const { cart, currentUser } = get();
 
-      // FIX: placeOrder now sends customerName + shopName (required for MyOrders
-      //      and LiveKitchen to correctly filter by user/shop).
-      // FIX: status changed from 'sent' → 'pending' ('sent' is NOT in the backend
-      //      enum and caused a Mongoose ValidationError on every order).
-      placeOrder: async (reel) => {
-        const { currentUser, fetchOrders } = get();
+    if (!currentUser) {
+      alert("Please login first");
+      return false;
+    }
 
-        if (!currentUser) {
-          alert("Please log in to place an order!");
-          return false;
-        }
+    let items, totalAmount, shopName;
 
-        try {
-          const res = await fetch(`${API_URL}/orders`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: currentUser._id,
-              customerName: currentUser.name,   // was missing — MyOrders filter broke
-              shopName: reel.shopName,           // was shopId — now matches Order schema
-              itemName: reel.itemName,
-              price: reel.price,
-              status: 'pending'                  // was 'sent' — invalid enum value
-            })
-          });
+    if (reel) {
+      items = [{
+        itemName: reel.itemName,
+        quantity: quantity,
+        price: reel.price
+      }];
+      totalAmount = reel.price * quantity;
+      shopName = reel.shopName;
+    } else {
+      if (cart.length === 0) return false;
+      items = cart.map(item => ({
+        itemName: item.itemName,
+        quantity: item.quantity,
+        price: item.price
+      }));
+      totalAmount = cart.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      );
+      shopName = cart[0]?.shopName;
+    }
 
-          if (res.ok) {
-            await fetchOrders();
-            return true;
-          }
-          return false;
-        } catch (error) {
-          console.error("Order failed", error);
-          return false;
-        }
-      },
+    const orderRes = await API.createOrder({
+      items,
+      totalAmount,
+      shopName
+    });
+    
+    if (orderRes) {
+      if (!reel) set({ cart: [] });
+      return true;
+    }
+    return false;
+  },
 
-      // FIX: placeCheckoutOrder is a SEPARATE function for the Checkout page flow
-      //      (Checkout.jsx was calling placeOrder({total, method, address}) which
-      //       has a completely different signature — that broke silently).
-      placeCheckoutOrder: ({ total, method, address }) => {
-        // For the checkout flow we just clear the cart and navigate.
-        // Extend this later to save to DB if needed.
-        set({ cart: [] });
-      },
+  likeReel: async (id) => {
+    const updated = await API.likeReel(id);
 
-      fetchOrders: async () => {
-        try {
-          const res = await fetch(`${API_URL}/orders`);
-          const data = await res.json();
-          set({ orders: data });
-        } catch (error) {
-          console.error("Fetch orders failed", error);
-        }
-      },
+    set((state) => ({
+      reels: state.reels.map(r =>
+        r._id === id ? updated : r
+      )
+    }));
+  },
 
-      toggleLike: (reelId) => set((state) => ({
-        userLikes: state.userLikes.includes(reelId)
-          ? state.userLikes.filter(id => id !== reelId)
-          : [...state.userLikes, reelId]
-      })),
-    }),
-    { name: 'foodreels-storage' }
-  )
-);
+  toggleLike: async (id) => {
+    const { userLikes, likeReel } = get();
+    await likeReel(id);
+    
+    // Toggle locally for fast UI
+    if (userLikes.includes(id)) {
+      set({ userLikes: userLikes.filter(likedId => likedId !== id) });
+    } else {
+      set({ userLikes: [...userLikes, id] });
+    }
+  }
+}));

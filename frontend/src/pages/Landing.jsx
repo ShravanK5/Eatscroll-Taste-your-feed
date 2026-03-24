@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { API_BASE_URL } from '../config'; // Exact match to your typo
+import { API_BASE_URL } from '../config'; 
+import { useStore } from '../store/useStore';
 
 export default function Landing() {
   const [isLogin, setIsLogin] = useState(true); // Toggle between Login and Register
@@ -15,36 +16,38 @@ export default function Landing() {
     e.preventDefault();
     
     try {
-      let res;
+      let realUser;
+      let token;
       
       if (isLogin) {
-        // 🟢 Uses your exact backend LOGIN route
-        res = await axios.post(`${API_BASE_URL}/api/auth/login`, {
-          email: email,
-          password: password
-        });
+        const res = await axios.post(`${API_BASE_URL}/api/auth/login`, { email, password });
+        realUser = res.data.user;
+        token = res.data.token;
       } else {
-        // 🟢 Uses your exact backend REGISTER route
-        res = await axios.post(`${API_BASE_URL}/api/auth/register`, {
-          name: name,
-          email: email,
-          password: password,
+        await axios.post(`${API_BASE_URL}/api/auth/register`, {
+          name,
+          email,
+          password,
           role: isUser ? 'customer' : 'owner',
           shopName: !isUser ? `${name}'s Kitchen` : undefined
         });
+        
+        const res = await axios.post(`${API_BASE_URL}/api/auth/login`, { email, password });
+        realUser = res.data.user;
+        token = res.data.token;
       }
 
-      // Your backend sends the user object directly, so we use res.data
-      const realUser = res.data;
-      
-      // Save to localStorage so ProtectedRoutes and Feed can see who is logged in
-      localStorage.setItem('currentUser', JSON.stringify(realUser));
-      
-      // Redirect based on the selected role
-      if (realUser.role === 'customer' || isUser) {
-        navigate('/feed');
-      } else {
-        navigate('/dashboard');
+      if (token && realUser) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(realUser));
+        localStorage.setItem('currentUser', JSON.stringify(realUser));
+        useStore.getState().setCurrentUser(realUser);
+        
+        if (realUser.role === 'customer' || isUser) {
+          navigate('/feed');
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (err) {
       console.error("Auth Error:", err.response?.data);
