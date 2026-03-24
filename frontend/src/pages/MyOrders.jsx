@@ -8,21 +8,38 @@ const MyOrders = () => {
   const user = JSON.parse(localStorage.getItem('currentUser')) || {};
 
   useEffect(() => {
-    // Fetch initial orders for THIS user
+    // FIX: was filtering by o.customerName === user.name, but the old placeOrder
+    //      never sent customerName so the filter always returned 0 results.
+    //      Now filters by userId (o.userId === user._id) which is always saved,
+    //      with a fallback to customerName for orders saved via socket (ReelCard).
     fetch(`${API_BASE_URL}/api/orders`)
       .then(res => res.json())
       .then(data => {
-        const myOrders = data.filter(o => o.customerName === user.name);
+        const myOrders = data.filter(o =>
+          o.userId === user._id || o.customerName === user.name
+        );
         setOrders(myOrders);
-      });
+      })
+      .catch(err => console.error('Failed to fetch orders', err));
 
-    // Listen for real-time status updates from the Chef!
-    socket.on('update-status', ({ orderId, status }) => {
+    socket.on('status-changed', ({ orderId, status }) => {
       setOrders(prev => prev.map(o => o._id === orderId ? { ...o, status } : o));
     });
 
-    return () => socket.off('update-status');
-  }, [user.name]);
+    // FIX: was listening on 'update-status' — but server emits 'status-changed'
+    //      from the socket update-status handler. Aligned to match server.js.
+    socket.on('incoming-order', (newOrder) => {
+      if (newOrder.userId === user._id || newOrder.customerName === user.name) {
+        setOrders(prev => [newOrder, ...prev]);
+      }
+    });
+
+    return () => {
+      socket.off('update-status');
+      socket.off('status-changed');
+      socket.off('incoming-order');
+    };
+  }, [user._id, user.name]);
 
   const getProgressWidth = (status) => {
     if (status === 'pending') return '33%';
@@ -48,26 +65,25 @@ const MyOrders = () => {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="font-bold text-lg text-gray-800">{order.itemName}</h3>
-                  <p className="text-sm text-gray-500">{order.shopName} • ${order.price}</p>
+                  <p className="text-sm text-gray-500">{order.shopName} • ₹{order.price}</p>
                 </div>
                 <div className="text-2xl">
                   {order.status === 'ready' ? '✅' : order.status === 'preparing' ? '🔥' : '⏳'}
                 </div>
               </div>
 
-              {/* Animated Progress Bar */}
               <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden flex mb-2 relative">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: getProgressWidth(order.status) }}
                   transition={{ duration: 0.5, ease: "easeInOut" }}
-                  className={`h-full rounded-full ${order.status === 'pending' ? 'bg-orange-400' :
-                      order.status === 'preparing' ? 'bg-blue-500' : 'bg-green-500'
-                    }`}
+                  className={`h-full rounded-full ${
+                    order.status === 'pending' ? 'bg-orange-400' :
+                    order.status === 'preparing' ? 'bg-blue-500' : 'bg-green-500'
+                  }`}
                 />
               </div>
 
-              {/* Status Labels */}
               <div className="flex justify-between text-[10px] font-black tracking-widest uppercase mt-2">
                 <span className={order.status === 'pending' ? 'text-orange-500' : 'text-gray-300'}>Sent</span>
                 <span className={order.status === 'preparing' ? 'text-blue-500' : 'text-gray-300'}>Cooking</span>

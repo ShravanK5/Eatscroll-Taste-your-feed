@@ -5,12 +5,14 @@ import { MapPin, CreditCard, Wallet, Banknote, ChevronLeft } from 'lucide-react'
 
 export default function Checkout() {
   const navigate = useNavigate();
-  const { cart, placeOrder } = useStore();
+  // FIX: was calling placeOrder({total, method, address}) but placeOrder expects
+  //      a reel object. Now uses placeCheckoutOrder which has the correct signature.
+  const { cart, placeCheckoutOrder } = useStore();
   const [method, setMethod] = useState('UPI');
   const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0) + 2.99;
 
   const handlePlaceOrder = () => {
-    placeOrder({ total, method, address: "123 Main St, Apt 4B" });
+    placeCheckoutOrder({ total, method, address: "123 Main St, Apt 4B" });
     navigate('/success');
   };
 
@@ -37,7 +39,9 @@ export default function Checkout() {
           </button>
         ))}
       </div>
-      <button onClick={handlePlaceOrder} className="w-full bg-amber text-white py-4 rounded-2xl font-bold text-lg animate-order-btn-pulse">Pay ${total.toFixed(2)}</button>
+      <button onClick={handlePlaceOrder} className="w-full bg-amber text-white py-4 rounded-2xl font-bold text-lg animate-order-btn-pulse">
+        Pay ${total.toFixed(2)}
+      </button>
     </div>
   );
 }

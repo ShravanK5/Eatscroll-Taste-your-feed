@@ -3,41 +3,43 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { User, Bookmark, Clock, Package, LogOut } from 'lucide-react';
 import { API_BASE_URL } from '../config';
+
 export default function Profile() {
   const navigate = useNavigate();
-  // 1. Get real user from localStorage
   const user = JSON.parse(localStorage.getItem('currentUser')) || {};
   const [tab, setTab] = useState('saved');
   const [userOrders, setUserOrders] = useState([]);
 
-  // 2. Use real global state
-  const { reels, userLikes, fetchReels } = useStore();
+  const { reels, userLikes, fetchReels, setCurrentUser } = useStore();
 
   useEffect(() => {
     fetchReels();
-    // Fetch real order history for this user
-    if (user.name) {
+    if (user._id) {
       fetch(`${API_BASE_URL}/api/orders`)
         .then(res => res.json())
         .then(data => {
-          const myOrders = data.filter(o => o.customerName === user.name);
+          // FIX: now filters by userId OR customerName for backwards compat
+          const myOrders = data.filter(
+            o => o.userId === user._id || o.customerName === user.name
+          );
           setUserOrders(myOrders);
         });
     }
-  }, [fetchReels, user.name]);
+  }, [fetchReels, user._id]);
 
   const handleLogout = () => {
     localStorage.removeItem('currentUser');
+    // FIX: was only clearing localStorage — Zustand currentUser was still set,
+    //      so placeOrder() still worked after logout (security bug).
+    //      Now also clears the Zustand store.
+    setCurrentUser(null);
     navigate('/');
   };
 
-  // 3. Match the likes using the MongoDB _id
-  // Fallback to savedReels if you haven't renamed it in your store yet
   const likedReels = reels.filter(r => (userLikes || []).includes(r._id));
 
   return (
-    <div className="min-h-screen bg-dark overflow-y-auto pb-24 pt-8 px-4 bg-black text-white">
-      {/* Header Section with Logout */}
+    <div className="min-h-screen bg-black overflow-y-auto pb-24 pt-8 px-4 text-white">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 bg-orange-500/20 text-orange-500 rounded-full flex items-center justify-center">
@@ -51,7 +53,6 @@ export default function Profile() {
             </span>
           </div>
         </div>
-
         <button
           onClick={handleLogout}
           className="p-3 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500/20 transition"
@@ -60,38 +61,36 @@ export default function Profile() {
         </button>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-2 mb-6 border-b border-white/10 pb-4">
         <button
           onClick={() => setTab('saved')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all ${tab === 'saved' ? 'bg-orange-500 text-black' : 'bg-gray-900 text-gray-400'
-            }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all ${
+            tab === 'saved' ? 'bg-orange-500 text-black' : 'bg-gray-900 text-gray-400'
+          }`}
         >
           <Bookmark size={18} /> Saved
         </button>
-
-        {/* Only show History tab for customers */}
         {user.role !== 'owner' && (
           <button
             onClick={() => setTab('orders')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all ${tab === 'orders' ? 'bg-white text-black' : 'bg-gray-900 text-gray-400'
-              }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all ${
+              tab === 'orders' ? 'bg-white text-black' : 'bg-gray-900 text-gray-400'
+            }`}
           >
             <Clock size={18} /> History
           </button>
         )}
       </div>
 
-      {/* SAVED TAB */}
       {tab === 'saved' && (
         <div className="grid grid-cols-2 gap-3">
           {likedReels.length === 0 ? (
             <p className="col-span-2 text-center text-gray-500 mt-10">No saved reels yet.</p>
           ) : likedReels.map(reel => (
             <div key={reel._id} className="relative rounded-2xl overflow-hidden aspect-[9/16] bg-gray-900">
-              <video src={reel.videoUrl} className="absolute inset-0 w-full h-full object-cover opacity-80" />
+              <video src={reel.videoUrl} className="absolute inset-0 w-full h-full object-cover opacity-80" muted />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent p-3 flex flex-col justify-end">
-                <h3 className="font-bold text-sm truncate">{reel.itemName || reel.title}</h3>
+                <h3 className="font-bold text-sm truncate">{reel.itemName}</h3>
                 <p className="text-xs text-gray-400">@{reel.shopName}</p>
               </div>
             </div>
@@ -99,7 +98,6 @@ export default function Profile() {
         </div>
       )}
 
-      {/* ORDERS HISTORY TAB */}
       {tab === 'orders' && user.role !== 'owner' && (
         <div className="space-y-4">
           {userOrders.length === 0 ? (
@@ -111,12 +109,13 @@ export default function Profile() {
                   <Package size={16} />
                   <span className="text-sm font-bold truncate max-w-[150px]">{order.itemName}</span>
                 </div>
-                <span className="text-orange-500 font-bold">${order.price}</span>
+                <span className="text-orange-500 font-bold">₹{order.price}</span>
               </div>
               <div className="flex justify-between items-center text-sm text-gray-400">
                 <span>From: {order.shopName}</span>
-                <span className={`px-2 py-1 rounded-full text-[10px] uppercase font-black ${order.status === 'ready' ? 'bg-green-500/20 text-green-500' : 'bg-blue-500/20 text-blue-500'
-                  }`}>
+                <span className={`px-2 py-1 rounded-full text-[10px] uppercase font-black ${
+                  order.status === 'ready' ? 'bg-green-500/20 text-green-500' : 'bg-blue-500/20 text-blue-500'
+                }`}>
                   {order.status}
                 </span>
               </div>

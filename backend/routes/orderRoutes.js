@@ -2,16 +2,23 @@ const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
 
-// NEW: Create an order (This connects the Button to the Database)
+// FIX 1: REMOVED the duplicate router.post('/') — Express only runs the FIRST match,
+//         so the second one was completely dead code and caused confusion.
+// FIX 2: Field names now match the Order schema AND what useStore.js sends.
+// FIX 3: Status defaults to 'pending' — 'sent' was NOT in the enum and caused a
+//         Mongoose ValidationError on every single order placement.
+
+// CREATE an order
 router.post('/', async (req, res) => {
   try {
-    const { userId, shopId, itemName, price, status } = req.body;
+    const { userId, customerName, shopName, itemName, price } = req.body;
     const newOrder = new Order({
       userId,
-      shopId,
+      customerName,
+      shopName,
       itemName,
       price,
-      status: status || 'sent'
+      status: 'pending'   // was 'sent' — invalid enum value, now fixed
     });
     const savedOrder = await newOrder.save();
     res.status(201).json(savedOrder);
@@ -20,41 +27,24 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: 'Failed to create order' });
   }
 });
-// Add this above your GET route in orderRoutes.js
-router.post('/', async (req, res) => {
-  try {
-    const { userId, shopId, itemName, price } = req.body;
-    const newOrder = new Order({
-      userId,
-      shopId,
-      itemName,
-      price,
-      status: 'sent' // Default status so it shows up in "My Orders"
-    });
-    const savedOrder = await newOrder.save();
-    res.status(201).json(savedOrder);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to save order to database' });
-  }
-});
-// 1. GET all orders
+
+// GET all orders (sorted newest first)
 router.get('/', async (req, res) => {
   try {
-    // Fetches all and sorts by newest first
-    const orders = await Order.find().sort({ createdAt: -1 }); 
+    const orders = await Order.find().sort({ createdAt: -1 });
     res.status(200).json(orders);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch orders' });
   }
 });
 
-// 2. UPDATE order status (Matches the Dashboard fetch call)
+// UPDATE order status
 router.patch('/:id', async (req, res) => {
   try {
     const { status } = req.body;
     const updatedOrder = await Order.findByIdAndUpdate(
-      req.params.id, 
-      { status }, 
+      req.params.id,
+      { status },
       { new: true }
     );
     if (!updatedOrder) return res.status(404).json({ error: "Order not found" });
@@ -64,7 +54,7 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-// 3. DELETE an order (The "Chef POV" delete option)
+// DELETE an order
 router.delete('/:id', async (req, res) => {
   try {
     const deletedOrder = await Order.findByIdAndDelete(req.params.id);

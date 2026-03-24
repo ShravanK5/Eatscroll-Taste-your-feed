@@ -1,15 +1,16 @@
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
-  customerName: String,
-  itemName: String,
-  price: Number,
-  shopName: String,
-  // 🎯 DEFAULT STATUS IS PENDING
-  status: { 
-    type: String, 
+  userId: { type: String },                // Added: sent by useStore
+  customerName: { type: String },          // Used by MyOrders & LiveKitchen filters
+  itemName: { type: String, required: true },
+  price: { type: Number, required: true },
+  shopName: { type: String },              // Used for LiveKitchen filtering
+  // FIX: Added 'sent' was being used but was not in enum — replaced with 'pending' as default
+  status: {
+    type: String,
     enum: ['pending', 'preparing', 'ready', 'delivered'],
-    default: 'pending' 
+    default: 'pending'
   },
   createdAt: { type: Date, default: Date.now }
 });

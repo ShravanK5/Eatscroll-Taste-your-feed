@@ -5,13 +5,25 @@ import { Heart, ShoppingBag } from 'lucide-react';
 export default function Feed() {
   const { reels, placeOrder, toggleLike, userLikes } = useStore();
 
+  // FIX: Added empty state — if reels is empty (backend not running or no uploads yet),
+  //      the page was just a blank black screen with zero feedback.
+  if (reels.length === 0) {
+    return (
+      <div className="h-[100dvh] w-full bg-black flex flex-col items-center justify-center text-center p-8">
+        <p className="text-5xl mb-4">🍽️</p>
+        <h2 className="text-white font-black text-2xl mb-2">No Reels Yet</h2>
+        <p className="text-gray-500 text-sm">Chefs haven't uploaded any food videos yet.<br/>Check back soon!</p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-[100dvh] w-full bg-black overflow-y-scroll snap-y snap-mandatory hide-scrollbar">
       {reels.map((reel) => (
-        <ReelItem 
-          key={reel._id} 
-          reel={reel} 
-          onOrder={() => placeOrder(reel)} 
+        <ReelItem
+          key={reel._id}
+          reel={reel}
+          onOrder={() => placeOrder(reel)}
           toggleLike={toggleLike}
           userLikes={userLikes}
         />
@@ -30,7 +42,8 @@ function ReelItem({ reel, onOrder, toggleLike, userLikes }) {
       ([entry]) => {
         if (entry.isIntersecting) videoRef.current?.play().catch(() => {});
         else videoRef.current?.pause();
-      }, { threshold: 0.7 }
+      },
+      { threshold: 0.7 }
     );
     if (videoRef.current) observer.observe(videoRef.current);
     return () => observer.disconnect();
@@ -38,8 +51,13 @@ function ReelItem({ reel, onOrder, toggleLike, userLikes }) {
 
   return (
     <div className="relative h-[100dvh] w-full snap-start bg-black">
-      <video ref={videoRef} src={reel.videoUrl} className="h-full w-full object-cover" loop muted playsInline />
-      
+      <video
+        ref={videoRef}
+        src={reel.videoUrl}
+        className="h-full w-full object-cover"
+        loop muted playsInline
+      />
+
       <div className="absolute right-4 bottom-32 z-20">
         <button onClick={() => toggleLike(reel._id)} className="p-3 bg-white/10 rounded-full">
           <Heart size={28} fill={isLiked ? "red" : "none"} className="text-white" />
@@ -50,11 +68,11 @@ function ReelItem({ reel, onOrder, toggleLike, userLikes }) {
         <div className="pointer-events-auto">
           <h3 className="text-white font-black text-xl">@{reel.shopName}</h3>
           <p className="text-gray-300 mb-4">{reel.itemName}</p>
-          
-          <button 
+
+          <button
             onClick={async (e) => {
               e.stopPropagation();
-              const success = await onOrder(); 
+              const success = await onOrder();
               if (success) {
                 setIsAdded(true);
                 setTimeout(() => setIsAdded(false), 2000);
